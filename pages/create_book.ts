@@ -2,8 +2,18 @@ import { Request, Response } from 'express';
 import Book from '../models/book';
 import express from 'express';
 import bodyParser from 'body-parser';
+import escapeHtml from 'escape-html';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
+
+const createBookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too frequent attempts, please try again later.'
+});
 
 /**
  * Middleware specific to this router
@@ -18,7 +28,7 @@ router.use(express.json());
  * @returns a newly created book for an existing author and genre in the database
  * @returns 500 error if book creation failed
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', createBookLimiter, async (req: Request, res: Response) => {
   const { familyName, firstName, genreName, bookTitle } = req.body;
   if (familyName && firstName && genreName && bookTitle) {
     try {
@@ -26,10 +36,10 @@ router.post('/', async (req: Request, res: Response) => {
       const savedBook = await book.saveBookOfExistingAuthorAndGenre(familyName, firstName, genreName, bookTitle);
       res.status(200).send(savedBook);
     } catch (err: unknown) {
-      res.status(500).send('Error creating book: ' + (err as Error).message);
+      res.status(500).send('Error creating book: ' + escapeHtml((err as Error).message));
     }
   } else {
-    res.send('Invalid Inputs');
+    res.status(400).send('Invalid Inputs');
   }
 });
 
